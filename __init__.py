@@ -198,7 +198,7 @@ def header_draw(self, context):
     )
 
 
-_limit = "X" * 80  # around here
+_limit = "X" * 80                                                              # around here
 
 
 def draw_79():

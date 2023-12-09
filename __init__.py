@@ -231,10 +231,12 @@ def unregister():
     bpy.utils.unregister_class(MOUSETRAP_OT_scroll)
 
 
-def reload():  # bpy.utils.text_editor_addon_reload()
+def reload():
+    # This can be `bpy.utils.text_editor_addon_reload()`?
+
     # Identifier of the script to reload
-    #   this uses current text name
-    #    change to your addon name
+    #   You can use current text name (__file__, but may not work if renamed),
+    #   or use your addon name.
     key = __file__
 
     # Setup registry

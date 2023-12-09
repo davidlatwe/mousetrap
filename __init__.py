@@ -43,7 +43,7 @@ class MOUSETRAP_OT_activate(bpy.types.Operator):
         cls.trapping = False
         cls.activated = False
         _redraw_headers(context)
-        self.report({"OPERATOR"}, "Off")
+        self.report({"OPERATOR"}, "mousetrap: off")
 
     def invoke(self, context, _event):
         cls = self.__class__
@@ -58,7 +58,7 @@ class MOUSETRAP_OT_activate(bpy.types.Operator):
         cls.trapping = True
         cls.activated = True
         _redraw_headers(context)
-        self.report({"OPERATOR"}, "On")
+        self.report({"OPERATOR"}, "mousetrap: on")
         context.window_manager.modal_handler_add(self)
         return {"RUNNING_MODAL"}
 
@@ -71,7 +71,7 @@ class MOUSETRAP_OT_activate(bpy.types.Operator):
 
         if not cls.activated:
             cls.trapping = False
-            self.report({"OPERATOR"}, "Starting new trap...")
+            self.report({"OPERATOR"}, "mousetrap: starting new trap...")
             return {"FINISHED"}
 
         if event.type == "ESC":

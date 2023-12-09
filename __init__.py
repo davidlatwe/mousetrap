@@ -10,10 +10,10 @@ bl_info = {
     "blender": (3, 4, 0),
     "category": "Interface",
     "author": "David Lai",
-    "description": "Trap your mouse in a text input area.",
     "location": "Text Editor > Header",
     "doc_url": "https://github.com/davidlatwe/mousetrap",
     "tracker_url": "https://github.com/davidlatwe/mousetrap/issues",
+    "description": "Trap your mouse in a text input area.",
 }
 
 
@@ -32,62 +32,35 @@ class MOUSETRAP_OT_activate(bpy.types.Operator):
     bl_idname = "mousetrap.activate"
     bl_label = "Activate Mouse Trap"
     bl_description = "Trap your mouse in a text input area"
-    bl_options = {"REGISTER"}
+    bl_options = {"INTERNAL"}
 
+    # global flags
     trapping = False
     activated = False
-    handler = {}
-    psize = 0
 
-    def invoke(self, context, event):
+    def _deactivate(self, context):
+        cls = self.__class__
+        cls.trapping = False
+        cls.activated = False
+        _redraw_headers(context)
+        self.report({"OPERATOR"}, "Off")
+
+    def invoke(self, context, _event):
         cls = self.__class__
         if cls.activated:
-            cls.trapping = False
-            cls.activated = False
-            cls.guide_remove()
-            print("Mouse Trap: Off")
-            _redraw_headers(context)
+            self._deactivate(context)
             return {"FINISHED"}
         else:
             return self.execute(context)
 
     def execute(self, context):
-        pref = context.preferences
         cls = self.__class__
-        cls.psize = pref.ui_styles[0].widget_label.points
-        cls.psize *= pref.system.ui_scale
         cls.trapping = True
         cls.activated = True
-        cls.guide_install()
-        print("Mouse Trap: On")
         _redraw_headers(context)
+        self.report({"OPERATOR"}, "On")
         context.window_manager.modal_handler_add(self)
         return {"RUNNING_MODAL"}
-
-    def trap(self, context, event):
-        cls = self.__class__
-        on_area = None
-        mouse = (event.mouse_x, event.mouse_y)
-        for area in context.screen.areas:
-            if area.type not in {"CONSOLE", "TEXT_EDITOR"}:
-                continue
-            if _on(area, *mouse):
-                for reg in area.regions:
-                    if reg.type == "HEADER" and not _on(reg, *mouse):
-                        on_area = area
-                        break
-                break
-        if on_area:
-            cls.trapping = True
-            cls.activated = False
-
-            def new_trap():
-                if cls.trapping:
-                    return 0.1
-                with context.temp_override(area=on_area):
-                    bpy.ops.mousetrap.activate("EXEC_DEFAULT")
-
-            bpy.app.timers.register(new_trap)
 
     def modal(self, context, event):
         cls = self.__class__
@@ -98,18 +71,23 @@ class MOUSETRAP_OT_activate(bpy.types.Operator):
 
         if not cls.activated:
             cls.trapping = False
-            print("Mouse Trap: Off")
+            self.report({"OPERATOR"}, "Starting new trap...")
             return {"FINISHED"}
 
-        if (event.type == "ESC" or
-                (event.type == "RIGHTMOUSE" and event.value == "PRESS")):
-            cls.trapping = False
-            _redraw_headers(context)
-            return {"RUNNING_MODAL"}
+        if event.type == "ESC":
+            self._deactivate(context)
+            return {"FINISHED"}
+
+        if event.type == "RIGHTMOUSE" and event.value == "PRESS":
+            # take a break
+            if cls.trapping:
+                cls.trapping = False
+                _redraw_headers(context)
+                return {"RUNNING_MODAL"}
 
         if event.type == "LEFTMOUSE" and event.value == "PRESS":
             if not cls.trapping:
-                self.trap(context, event)
+                self._trap_on_pressed(context, event)
                 return {"PASS_THROUGH"}
 
         space = area.spaces.active
@@ -142,52 +120,93 @@ class MOUSETRAP_OT_activate(bpy.types.Operator):
         # convenient stuff
         #
         if text and event.ctrl and not (event.shift or event.alt):
-            if event.type == "UP_ARROW" and event.value == "PRESS":
-                center = space.top + (space.visible_lines // 2) - 3
-                bpy.ops.text.scroll(lines=-1)
-                bpy.ops.text.jump(line=center)
-                return {"RUNNING_MODAL"}
-
-            elif event.type == "DOWN_ARROW" and event.value == "PRESS":
-                center = space.top + (space.visible_lines // 2) + 3
-                bpy.ops.text.scroll(lines=1)  # TODO: This crash blender after
-                bpy.ops.text.jump(line=center)
-                return {"RUNNING_MODAL"}
-
+            return self._scroll(event)
         elif text and event.type == "HOME" and event.value == "PRESS":
-            line = text.current_line.body
-            home = len(line) - len(line.lstrip())
-            if text.current_character == home:
-                home = 0
-            elif text.select_end_character == home:
-                home = 0
-            text.cursor_set(
-                line=text.current_line_index,
-                character=home,
-                select=event.shift,
-            )
-            return {"RUNNING_MODAL"}
+            return self._char_home(text, event)
 
         return {"PASS_THROUGH"}
 
     @classmethod
-    def guide_install(cls):
-        if "_" in cls.handler:
-            return
-        cls.handler["_"] = bpy.types.SpaceTextEditor.draw_handler_add(
-            draw_79, (), "WINDOW", "POST_PIXEL"
-        )
+    def _trap_on_pressed(cls, context, event):
+        mouse = (event.mouse_x, event.mouse_y)
+        trap_area = None
+        for area in context.screen.areas:
+            if area.type not in {"CONSOLE", "TEXT_EDITOR"}:
+                continue
+            if _on(area, *mouse):
+                for region in area.regions:
+                    # Do nothing if mouse is on Header, for toggling button.
+                    if region.type == "HEADER" and not _on(region, *mouse):
+                        trap_area = area
+                        break
+                break
+
+        if trap_area:
+            cls._restart(context, trap_area)
 
     @classmethod
-    def guide_remove(cls):
-        if "_" not in cls.handler:
-            return
-        bpy.types.SpaceTextEditor.draw_handler_remove(
-            cls.handler.pop("_"), "WINDOW"
+    def _restart(cls, context, trap_area):
+        cls.trapping = True  # For new trap to wait.
+        cls.activated = False
+
+        def new_trap():
+            if cls.trapping:
+                return 0.1
+            with context.temp_override(area=trap_area):
+                bpy.ops.mousetrap.activate("EXEC_DEFAULT")
+
+        bpy.app.timers.register(new_trap)
+
+    def _scroll(self, event):
+        _safe = False
+        # Why unsafe? Here are the steps to crash:
+        # 1. Activate mousetrap
+        # 2. Right click release mouse
+        # 3. Click another window e.g. web browser, and back to blender
+        # 4. Hit Ctrl + Up/Down in Text Editor, blender crashed
+        if _safe:
+            if event.type == "UP_ARROW" and event.value == "PRESS":
+                bpy.ops.mousetrap.scroll(step=-1)
+                return {"RUNNING_MODAL"}
+
+            elif event.type == "DOWN_ARROW" and event.value == "PRESS":
+                bpy.ops.mousetrap.scroll(step=1)
+                return {"RUNNING_MODAL"}
+
+        return {"PASS_THROUGH"}
+
+    def _char_home(self, text, event):
+        line = text.current_line.body
+        home = len(line) - len(line.lstrip())
+        if text.current_character == home:
+            home = 0
+        elif text.select_end_character == home:
+            home = 0
+        text.cursor_set(
+            line=text.current_line_index,
+            character=home,
+            select=event.shift,
         )
+        return {"RUNNING_MODAL"}
 
 
-def header_draw(self, context):
+class MOUSETRAP_OT_scroll(bpy.types.Operator):
+    bl_idname = "mousetrap.scroll"
+    bl_label = "Trap scroll"
+    bl_description = "Scroll while holding cursor at view center"
+    bl_options = {"INTERNAL"}
+
+    step: bpy.props.IntProperty()
+
+    def execute(self, context):
+        space = context.area.spaces.active
+        center = space.top + (space.visible_lines // 2) + (3 * self.step)
+        bpy.ops.text.jump(line=center)
+        bpy.ops.text.scroll(lines=self.step)
+        return {"FINISHED"}
+
+
+def _header_draw(self, _context):
     cls = MOUSETRAP_OT_activate
     self.layout.separator()
     self.layout.operator(
@@ -198,38 +217,18 @@ def header_draw(self, context):
     )
 
 
-_limit = "X" * 80                                                              # around here
-
-
-def draw_79():
-    cls = MOUSETRAP_OT_activate
-    area = bpy.context.area
-    print(area.type)
-    space = area.spaces.active
-    blf.size(0, cls.psize)
-    p, _ = blf.dimensions(0, _limit)
-
-    w = 1
-    h = area.height
-
-    vertices = ((p, 0), (p + w, 0), (p, h), (p + w, h))
-    indices = ((0, 1, 2), (2, 1, 3))
-    shader = gpu.shader.from_builtin("UNIFORM_COLOR")
-    batch = batch_for_shader(shader, "TRIS", {"pos": vertices}, indices=indices)
-    shader.uniform_float("color", (1, 1, 1, 0.5))
-    batch.draw(shader)
-
-
 def register():
+    bpy.utils.register_class(MOUSETRAP_OT_scroll)
     bpy.utils.register_class(MOUSETRAP_OT_activate)
-    bpy.types.TEXT_HT_header.append(header_draw)
-    bpy.types.CONSOLE_HT_header.append(header_draw)
+    bpy.types.TEXT_HT_header.append(_header_draw)
+    bpy.types.CONSOLE_HT_header.append(_header_draw)
 
 
 def unregister():
-    bpy.types.CONSOLE_HT_header.remove(header_draw)
-    bpy.types.TEXT_HT_header.remove(header_draw)
+    bpy.types.CONSOLE_HT_header.remove(_header_draw)
+    bpy.types.TEXT_HT_header.remove(_header_draw)
     bpy.utils.unregister_class(MOUSETRAP_OT_activate)
+    bpy.utils.unregister_class(MOUSETRAP_OT_scroll)
 
 
 def reload():  # bpy.utils.text_editor_addon_reload()

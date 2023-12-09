@@ -16,6 +16,47 @@ bl_info = {
     "description": "Trap your mouse in a text input area.",
 }
 
+_addon_keymaps = []
+
+
+def register():
+    bpy.utils.register_class(MOUSETRAP_OT_scroll)
+    bpy.utils.register_class(MOUSETRAP_OT_activate)
+    bpy.types.TEXT_HT_header.append(_header_draw)
+    bpy.types.CONSOLE_HT_header.append(_header_draw)
+
+    if bpy.app.background:
+        return
+
+    kc = bpy.context.window_manager.keyconfigs.addon
+    hotkey = dict(
+        idname=MOUSETRAP_OT_activate.bl_idname,
+        type="ACCENT_GRAVE",  # `
+        value="PRESS",
+        ctrl=True,
+        shift=True,
+    )
+    km_console = kc.keymaps.new(name="Mousetrap", space_type="CONSOLE")
+    hk_console = km_console.keymap_items.new(**hotkey)
+    hk_console.active = True
+    _addon_keymaps.append((km_console, hk_console))
+
+    km_text_ed = kc.keymaps.new(name="Mousetrap", space_type="TEXT_EDITOR")
+    hk_text_ed = km_text_ed.keymap_items.new(**hotkey)
+    hk_text_ed.active = True
+    _addon_keymaps.append((km_text_ed, hk_text_ed))
+
+
+def unregister():
+    bpy.types.CONSOLE_HT_header.remove(_header_draw)
+    bpy.types.TEXT_HT_header.remove(_header_draw)
+    bpy.utils.unregister_class(MOUSETRAP_OT_activate)
+    bpy.utils.unregister_class(MOUSETRAP_OT_scroll)
+
+    for km, km_item in _addon_keymaps:
+        km.keymap_items.remove(km_item)
+    _addon_keymaps.clear()
+
 
 def _on(zone, x, y):
     return (zone.x < x < (zone.x + zone.width) and
@@ -215,20 +256,6 @@ def _header_draw(self, _context):
         icon="MOUSE_RMB_DRAG" if cls.trapping else "MOUSE_MOVE",
         depress=cls.activated,
     )
-
-
-def register():
-    bpy.utils.register_class(MOUSETRAP_OT_scroll)
-    bpy.utils.register_class(MOUSETRAP_OT_activate)
-    bpy.types.TEXT_HT_header.append(_header_draw)
-    bpy.types.CONSOLE_HT_header.append(_header_draw)
-
-
-def unregister():
-    bpy.types.CONSOLE_HT_header.remove(_header_draw)
-    bpy.types.TEXT_HT_header.remove(_header_draw)
-    bpy.utils.unregister_class(MOUSETRAP_OT_activate)
-    bpy.utils.unregister_class(MOUSETRAP_OT_scroll)
 
 
 def reload():

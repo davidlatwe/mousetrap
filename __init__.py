@@ -7,7 +7,7 @@ from gpu_extras.batch import batch_for_shader  # noqa
 bl_info = {
     "name": "mousetrap",
     "version": (0, 1, 0),
-    "blender": (3, 4, 0),
+    "blender": (3, 2, 0),
     "category": "Interface",
     "author": "David Lai",
     "location": "Text Editor > Header",
@@ -198,6 +198,7 @@ class MOUSETRAP_OT_activate(bpy.types.Operator):
         def new_trap():
             if cls.trapping:
                 return 0.1
+            # note: temp_override was introduced since 3.2
             with context.temp_override(area=trap_area):
                 bpy.ops.mousetrap.activate("EXEC_DEFAULT")
 

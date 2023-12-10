@@ -264,6 +264,7 @@ def _header_draw(self, _context):
 
 
 def reload_addon_in_text():
+    # For testing in blender text editor.
     # This can be in `bpy.utils`?
 
     # Identifier of the script to reload

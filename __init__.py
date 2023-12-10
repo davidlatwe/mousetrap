@@ -263,8 +263,8 @@ def _header_draw(self, _context):
     )
 
 
-def reload():
-    # This can be `bpy.utils.text_editor_addon_reload()`?
+def reload_addon_in_text():
+    # This can be in `bpy.utils`?
 
     # Identifier of the script to reload
     #   You can use current text name (__file__, but may not work if renamed),
@@ -273,7 +273,7 @@ def reload():
 
     # Setup registry
     if not hasattr(sys, "_my_scripts"):
-        sys._my_scripts = {}
+        sys._my_scripts = {}  # this can survive through importlib.reload
     registry = sys._my_scripts
 
     # Unregister previous session
@@ -287,4 +287,4 @@ def reload():
 
 
 if __name__ == "__main__":
-    reload()
+    reload_addon_in_text()

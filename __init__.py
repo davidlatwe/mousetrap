@@ -5,7 +5,7 @@ from gpu_extras.batch import batch_for_shader  # noqa
 
 bl_info = {
     "name": "mousetrap",
-    "version": (0, 1, 0),
+    "version": (0, 1, 1),
     "blender": (3, 2, 0),
     "category": "Interface",
     "author": "David Lai",

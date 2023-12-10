@@ -1,4 +1,3 @@
-import sys
 import bpy  # noqa
 import blf  # noqa
 import gpu  # noqa
@@ -274,9 +273,9 @@ def reload_addon_in_text():
     key = __file__
 
     # Setup registry
-    if not hasattr(sys, "_my_scripts"):
-        sys._my_scripts = {}  # this can survive through importlib.reload
-    registry = sys._my_scripts
+    if not hasattr(bpy, "_my_scripts"):
+        bpy._my_scripts = {}  # this can survive through importlib.reload
+    registry = bpy._my_scripts
 
     # Unregister previous session
     prev_globals = registry.pop(key, None)

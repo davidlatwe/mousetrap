@@ -28,7 +28,7 @@ def register():
     if bpy.app.background:
         return
 
-    kc = bpy.context.window_manager.keyconfigs.addon
+    keyconfigs = bpy.context.window_manager.keyconfigs
     hotkey = dict(
         idname=MOUSETRAP_OT_activate.bl_idname,
         type="ACCENT_GRAVE",  # `
@@ -36,15 +36,20 @@ def register():
         ctrl=True,
         shift=True,
     )
-    km_console = kc.keymaps.new(name="Mousetrap", space_type="CONSOLE")
-    hk_console = km_console.keymap_items.new(**hotkey)
-    hk_console.active = True
-    _addon_keymaps.append((km_console, hk_console))
 
-    km_text_ed = kc.keymaps.new(name="Mousetrap", space_type="TEXT_EDITOR")
-    hk_text_ed = km_text_ed.keymap_items.new(**hotkey)
-    hk_text_ed.active = True
-    _addon_keymaps.append((km_text_ed, hk_text_ed))
+    spaces = (
+        ("CONSOLE", "Console"),
+        ("TEXT_EDITOR", "Text Generic")
+    )
+    for space, name in spaces:
+        keymap = keyconfigs.addon.keymaps.new(
+            name=name,
+            space_type=space
+        )
+        keymap_item = keymap.keymap_items.new(**hotkey)
+        keymap_item.active = True
+        keymap.keymap_items.update()
+        _addon_keymaps.append((keymap, keymap_item))
 
 
 def unregister():
